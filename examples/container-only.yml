@@ -1,0 +1,39 @@
+# Example: Container-Only Pipeline
+# This file shows how to use just the container build workflow
+# Copy this to your repository as .github/workflows/container.yml
+
+name: Container Build Pipeline
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Use the platform's container build workflow
+  build-container:
+    uses: flynn-actions/platform-workflows/.github/workflows/container-build.yml@main
+    with:
+      image_name: my-application
+      dockerfile_path: ./Dockerfile
+      registry: ghcr.io
+      # Build for multiple platforms
+      platforms: linux/amd64,linux/arm64
+    secrets:
+      REGISTRY_USERNAME: ${{ github.actor }}
+      REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+  # Optional: Additional steps after container build
+  post-build:
+    runs-on: ubuntu-latest
+    needs: build-container
+    if: success() && github.ref == 'refs/heads/main'
+    steps:
+      - name: Notify Container Built
+        uses: flynn-actions/platform-actions/notify@v1
+        with:
+          status: 'success'
+          environment: 'prod'
+          webhook-url: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          custom-message: 'New container image published: ${{ needs.build-container.outputs.image-tag }}'
