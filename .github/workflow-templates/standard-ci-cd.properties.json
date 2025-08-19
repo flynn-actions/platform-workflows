@@ -1,0 +1,7 @@
+{
+  "name": "Standard CI/CD Pipeline",
+  "description": "Enterprise-standard CI/CD pipeline with security scanning, testing, and deployment",
+  "iconName": "rocket",
+  "categories": ["CI", "CD", "Security"],
+  "filePatterns": ["package.json", "*.js", "*.ts", "*.jsx", "*.tsx"]
+}

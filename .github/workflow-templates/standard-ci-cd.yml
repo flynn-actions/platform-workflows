@@ -1,0 +1,18 @@
+name: CI/CD Pipeline
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci-cd:
+    uses: flynn-actions/platform-workflows/.github/workflows/standard-ci-cd.yml@main
+    with:
+      environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+      node_version: '18'
+      run_tests: true
+      deploy: ${{ github.ref == 'refs/heads/main' }}
+    secrets:
+      DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
