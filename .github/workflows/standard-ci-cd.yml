@@ -28,6 +28,9 @@ on:
       SONAR_TOKEN:
         description: 'SonarQube token for code analysis'
         required: false
+      TEAMS_WEBHOOK_URL:
+        description: 'Teams webhook URL for notifications'
+        required: false
 
 jobs:
   security-scan:
@@ -70,7 +73,7 @@ jobs:
         run: npm test
         
       - name: Code Quality Analysis
-        if: ${{ secrets.SONAR_TOKEN }}
+        if: ${{ secrets.SONAR_TOKEN != '' }}
         uses: flynn-actions/platform-actions/sonar-analysis@v1
         with:
           sonar-token: ${{ secrets.SONAR_TOKEN }}
