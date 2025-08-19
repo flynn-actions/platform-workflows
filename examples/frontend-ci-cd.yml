@@ -1,0 +1,58 @@
+# Example: Frontend Team CI/CD Pipeline
+# This file shows how consumer organizations should use platform workflows
+# Copy this to your repository as .github/workflows/ci-cd.yml
+
+name: Frontend CI/CD Pipeline
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Use the platform's standard CI/CD workflow
+  ci-cd:
+    uses: flynn-actions/platform-workflows/.github/workflows/standard-ci-cd.yml@main
+    with:
+      # Configure for frontend application
+      environment: $${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      node_version: '18'
+      run_tests: true
+      deploy: ${{ github.ref == 'refs/heads/main' }}
+    secrets:
+      DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # Optional: Add frontend-specific steps using platform actions
+  frontend-specific:
+    runs-on: ubuntu-latest
+    needs: ci-cd
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Use platform security scanning
+      - name: Frontend Security Scan
+        uses: flynn-actions/platform-actions/security-scan@v1
+        with:
+          severity: 'medium'
+          fail-on-findings: true
+          exclude-paths: 'node_modules,dist'
+      
+      # Use platform health check
+      - name: Health Check
+        uses: flynn-actions/platform-actions/health-check@v1
+        with:
+          environment: $${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+          timeout: 300
+          check-dependencies: true
+      
+      # Use platform notifications
+      - name: Notify Team
+        if: always()
+        uses: flynn-actions/platform-actions/notify@v1
+        with:
+          status: ${{ job.status }}
+          environment: $${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+          webhook-url: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          custom-message: 'Frontend deployment completed'
