@@ -1,0 +1,79 @@
+# Example: Backend Team CI/CD Pipeline
+# This file shows how consumer organizations should use platform workflows
+# Copy this to your repository as .github/workflows/ci-cd.yml
+
+name: Backend CI/CD Pipeline
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Use the platform's standard CI/CD workflow
+  ci-cd:
+    uses: flynn-actions/platform-workflows/.github/workflows/standard-ci-cd.yml@main
+    with:
+      # Configure for backend application
+      environment: $${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      node_version: '20'  # Backend might use different Node version
+      run_tests: true
+      deploy: ${{ github.ref == 'refs/heads/main' }}
+    secrets:
+      DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # Backend-specific container build
+  container-build:
+    uses: flynn-actions/platform-workflows/.github/workflows/container-build.yml@main
+    with:
+      image_name: backend-api
+      dockerfile_path: ./Dockerfile
+      registry: ghcr.io
+    secrets:
+      REGISTRY_USERNAME: ${{ github.actor }}
+      REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+  # Backend-specific steps using platform actions
+  backend-specific:
+    runs-on: ubuntu-latest
+    needs: [ci-cd, container-build]
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Use platform security scanning with backend-specific config
+      - name: Backend Security Scan
+        uses: flynn-actions/platform-actions/security-scan@v1
+        with:
+          severity: 'high'  # Backend might need stricter security
+          fail-on-findings: true
+          exclude-paths: 'node_modules,vendor,coverage'
+      
+      # Use platform deployment
+      - name: Deploy Backend
+        uses: flynn-actions/platform-actions/deploy@v1
+        with:
+          environment: $${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+          deploy-token: ${{ secrets.DEPLOY_TOKEN }}
+          artifacts-path: 'dist/'
+          rollback-on-failure: true
+      
+      # Use platform health check for API
+      - name: API Health Check
+        uses: flynn-actions/platform-actions/health-check@v1
+        with:
+          environment: $${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+          timeout: 600  # API might need more time
+          check-database: true
+          check-dependencies: true
+      
+      # Use platform notifications
+      - name: Notify Team
+        if: always()
+        uses: flynn-actions/platform-actions/notify@v1
+        with:
+          status: ${{ job.status }}
+          environment: $${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+          webhook-url: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          custom-message: 'Backend API deployment completed'
